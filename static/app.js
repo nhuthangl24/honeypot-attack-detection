@@ -6,6 +6,8 @@ let currentTotal = 0;
 let currentEventData = null;
 let currentSessionData = null;
 let currentModalTab = "ai-view";
+let jsonViewMode = "code";
+let jsonSearchQuery = "";
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({
@@ -156,6 +158,36 @@ function renderModalBody() {
   if (currentModalTab === "ai-view") {
     const hasCommand = Boolean(e.command && e.command.trim());
     const hasOutput = Boolean(e.command_output && e.command_output.trim());
+    const isStart = (e.event_status || "").toLowerCase().includes("start");
+    const isLoginFailed = (e.event_status || "").toLowerCase().includes("fail");
+
+    let heroHeadline = "";
+    if (hasCommand) {
+      heroHeadline = `Thực thi lệnh: <code style="color:var(--cyan);font-family:'JetBrains Mono',monospace;">${esc(e.command)}</code>`;
+    } else if (isStart) {
+      heroHeadline = `Phiên SSH mới được kết nối bởi <code style="color:var(--green);">${esc(e.username || 'unknown')}</code>`;
+    } else if (isLoginFailed) {
+      heroHeadline = `Đăng nhập thất bại (Tài khoản: ${esc(e.username || 'unknown')})`;
+    } else {
+      heroHeadline = esc(e.message || "Sự kiện an ninh Honeypot");
+    }
+
+    const heroCardHtml = `
+      <div class="inspector-hero">
+        <div class="inspector-hero-top">
+          <span class="eyebrow" style="margin:0;">EVENT #${e.id} SUMMARY</span>
+          ${statusBadge(e.event_status)}
+        </div>
+        <div class="inspector-hero-title">${heroHeadline}</div>
+        <div class="inspector-badges">
+          <span class="inspector-badge">🌐 <b>${esc(e.source_ip || '—')}</b>:${e.source_port || '—'}</span>
+          <span class="inspector-badge">👤 User: <b>${esc(e.username || 'root')}</b></span>
+          <span class="inspector-badge">🛡️ Protocol: <b>${esc(e.protocol ? e.protocol.toUpperCase() : 'SSH')}</b></span>
+          <span class="inspector-badge">⏱️ <b>${esc(fmtTime(e.timestamp))}</b></span>
+          ${e.session_id ? `<span class="inspector-badge" title="${esc(e.session_id)}" style="cursor:pointer;" onclick="copyText('${esc(e.session_id)}', 'Session ID')">🆔 ${esc(e.session_id.slice(0, 14))}… 📋</span>` : ''}
+        </div>
+      </div>
+    `;
 
     let aiTerminalHtml = "";
     if (hasCommand) {
@@ -165,17 +197,18 @@ function renderModalBody() {
           <span class="t-dot t-red"></span>
           <span class="t-dot t-yellow"></span>
           <span class="t-dot t-green"></span>
-          <span class="terminal-title">BEELZEBUB AI TERMINAL SIMULATION (SSH SHELL)</span>
+          <span class="terminal-title">BEELZEBUB AI SSH TERMINAL EMULATION</span>
+          <button class="secondary-btn btn-sm" style="margin-left:auto;padding:3px 8px;font-size:9px;" onclick="copyCommandOutput()" title="Sao chép câu trả lời AI">📋 Copy Output</button>
         </div>
         <div class="terminal-content">
           <div class="terminal-prompt-line">
             <span class="user-host">${esc(e.username || 'root')}@beelzebub</span>:<span class="dir">~</span># <span class="term-cmd">${esc(e.command)}</span>
           </div>
-          <div class="terminal-output">${esc(hasOutput ? e.command_output : '[No stdout / Empty output returned]')}</div>
+          <div class="terminal-output">${esc(hasOutput ? e.command_output : '[No stdout / Empty output produced]')}</div>
         </div>
         <div class="terminal-footer">
-          <span>⚡ Phản hồi do AI Honeypot (LLM Virtualization) tự động sinh ra cho Attacker</span>
-          <span>Status: ${esc(e.event_status || 'Interaction')}</span>
+          <span>⚡ Phản hồi mô phỏng do AI Honeypot (LLM Deception) tự động sinh cho Attacker</span>
+          <span>Decoy: ${esc(e.service_description || 'AI SSH Linux Terminal')}</span>
         </div>
       </div>`;
     } else {
@@ -190,8 +223,8 @@ function renderModalBody() {
         <div class="terminal-content">
           <div class="term-info">
             🔹 <strong>Trạng thái: ${esc(e.event_status || 'Start')} (${esc(e.message || 'New SSH Terminal Session')})</strong><br>
-            Kẻ tấn công từ IP <code>${esc(e.source_ip || 'unknown')}</code> vừa đăng nhập thành công với tài khoản <code>${esc(e.username || 'unknown')}</code>.<br>
-            <em>ℹ️ Ở sự kiện bắt đầu phiên này, attacker chưa thực thi lệnh nên trường lệnh & AI trả lời đang để trống. Xem tab <strong>Session Replay</strong> để theo dõi toàn bộ lệnh và phản hồi AI tiếp theo trong phiên này.</em>
+            Kẻ tấn công từ IP <code>${esc(e.source_ip || 'unknown')}</code> vừa xác thực thành công tài khoản <code>${esc(e.username || 'unknown')}</code>.<br>
+            <em>ℹ️ Ở sự kiện bắt đầu phiên này, attacker chưa thực thi lệnh nên trường lệnh & AI trả lời đang để trống. Xem danh sách bên dưới hoặc tab <strong>Session Replay</strong> để theo dõi toàn bộ lệnh và phản hồi AI trong phiên này.</em>
           </div>
         </div>
         <div class="terminal-footer">
@@ -201,29 +234,69 @@ function renderModalBody() {
       </div>`;
     }
 
-    const fields = [
-      ["Timestamp", e.timestamp],
-      ["Source IP", e.source_ip],
-      ["Source Port", e.source_port ? String(e.source_port) : "—"],
-      ["Protocol", e.protocol ? e.protocol.toUpperCase() : "SSH"],
-      ["Session ID", e.session_id],
-      ["Status", e.event_status],
-      ["Username", e.username],
-      ["Message", e.message],
-      ["Service / Decoy", e.service_description]
+    const connKvs = [
+      ["Source IP & Port", `${esc(e.source_ip || '—')}:${esc(e.source_port || '—')}`],
+      ["Protocol", esc(e.protocol ? e.protocol.toUpperCase() : "SSH")],
+      ["Decoy Service", esc(e.service_description || "AI SSH Honeypot")],
+      ["Timestamp (UTC)", esc(e.timestamp || "—")]
     ];
 
-    container.innerHTML = `
-      ${aiTerminalHtml}
-      <div class="eyebrow" style="margin-bottom:8px;">SESSION & METRIC DETAILS</div>
-      <div class="detail-grid">
-        ${fields.map(([k, v]) => `
-          <div class="detail-field">
-            <label>${esc(k)}</label>
-            <div>${esc(v || "—")}</div>
+    const authKvs = [
+      ["Target Username", esc(e.username || "—")],
+      ["Event Status", esc(e.event_status || "—")],
+      ["Session ID", esc(e.session_id ? e.session_id.slice(0, 18) + "…" : "—")],
+      ["Ingested At", esc(fmtTime(e.ingested_at || e.timestamp))]
+    ];
+
+    if (e.http_method || e.request_uri) {
+      connKvs.push(["HTTP Method", esc(e.http_method || "—")]);
+      connKvs.push(["Request URI", esc(e.request_uri || "—")]);
+    }
+
+    let sessionTimelineHtml = "";
+    if (currentSessionData && currentSessionData.events && currentSessionData.events.length > 1) {
+      const otherCmds = currentSessionData.events.filter(x => x.command);
+      if (otherCmds.length > 0) {
+        sessionTimelineHtml = `
+          <div style="margin-top:16px;">
+            <div class="panel-heading" style="margin-bottom:8px;">
+              <div>
+                <h3 style="font-size:12px;">Các lệnh và AI trả lời trong cùng phiên (${otherCmds.length} lệnh)</h3>
+                <p>Xem nhanh các tương tác khác của attacker trong phiên này</p>
+              </div>
+              <button class="text-button" onclick="switchModalTab('session-view')">Xem toàn bộ phiên ↗</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${otherCmds.slice(0, 4).map(c => `
+                <div style="background:#090f17;border:1px solid #1a2839;border-radius:6px;padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;">
+                  <div style="color:#ffffff;font-weight:600;margin-bottom:3px;">$ ${esc(c.command)}</div>
+                  <div style="color:#86efac;font-size:10px;white-space:pre-wrap;max-height:48px;overflow:hidden;text-overflow:ellipsis;">${esc((c.command_output || '[Empty output]').slice(0, 160))}</div>
+                </div>
+              `).join("")}
+            </div>
           </div>
-        `).join("")}
+        `;
+      }
+    }
+
+    container.innerHTML = `
+      ${heroCardHtml}
+      ${aiTerminalHtml}
+      <div class="inspector-sections">
+        <div class="inspector-card">
+          <div class="inspector-card-title">🌐 Connection Details</div>
+          ${connKvs.map(([k, v]) => `
+            <div class="inspector-kv"><span class="inspector-k">${k}</span><span class="inspector-v" title="${v}">${v}</span></div>
+          `).join("")}
+        </div>
+        <div class="inspector-card">
+          <div class="inspector-card-title">🛡️ Security & Identity</div>
+          ${authKvs.map(([k, v]) => `
+            <div class="inspector-kv"><span class="inspector-k">${k}</span><span class="inspector-v" title="${v}">${v}</span></div>
+          `).join("")}
+        </div>
       </div>
+      ${sessionTimelineHtml}
     `;
 
   } else if (currentModalTab === "session-view") {
@@ -264,17 +337,203 @@ function renderModalBody() {
 
   } else if (currentModalTab === "json-view") {
     const jsonStr = JSON.stringify(e, null, 2);
+    const keyCount = Object.keys(e).length;
+    const byteSize = (new Blob([jsonStr])).size;
+    const kbStr = byteSize > 1024 ? (byteSize / 1024).toFixed(1) + " KB" : byteSize + " B";
+
     container.innerHTML = `
-      <div class="raw-container">
-        <div class="raw-actions">
-          <button class="secondary-btn btn-sm" onclick="copyRawJson()">📋 Copy JSON String</button>
-          <button class="secondary-btn btn-sm" onclick="downloadCurrentJson()">⬇ Download event-${e.id}.json</button>
+      <div class="json-viewer-wrapper">
+        <div class="json-toolbar">
+          <div class="json-toolbar-left">
+            <div class="view-toggles">
+              <button class="view-toggle-btn ${jsonViewMode === 'code' ? 'active' : ''}" onclick="switchJsonMode('code')">
+                <span style="font-size:12px;">▤</span> Code View
+              </button>
+              <button class="view-toggle-btn ${jsonViewMode === 'tree' ? 'active' : ''}" onclick="switchJsonMode('tree')">
+                <span style="font-size:12px;">☵</span> Interactive Tree
+              </button>
+            </div>
+            <span class="json-meta-tag">
+              <span class="dot cyan-dot"></span>
+              <span>${keyCount} keys · ${kbStr}</span>
+            </span>
+          </div>
+          <div class="json-toolbar-right">
+            <div class="json-search-box">
+              <span style="color:#64748b;">⌕</span>
+              <input id="json-search-input" value="${esc(jsonSearchQuery)}" placeholder="Search JSON…" oninput="filterJson(this.value)" autocomplete="off">
+              <span class="json-search-count" id="json-search-matches"></span>
+            </div>
+            <button class="secondary-btn btn-sm" onclick="copyRawJson()" title="Copy entire JSON">📋 Copy</button>
+            <button class="secondary-btn btn-sm" onclick="downloadCurrentJson()" title="Save as file">⬇ Save</button>
+            <a href="/api/events/${e.id}" target="_blank" class="secondary-btn btn-sm" title="View raw in browser">🔗 API</a>
+          </div>
         </div>
-        <pre class="raw-block"><code>${esc(jsonStr)}</code></pre>
+        <div id="json-view-container">
+          ${jsonViewMode === 'code' ? renderCodeView(e, jsonSearchQuery) : renderTreeView(e)}
+        </div>
       </div>
     `;
   }
 }
+
+function syntaxHighlight(jsonStr, query = "") {
+  let escaped = jsonStr.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  
+  let colored = escaped.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+    let cls = 'j-num';
+    if (/^"/.test(match)) {
+      if (/:$/.test(match)) {
+        cls = 'j-key';
+        return '<span class="' + cls + '">' + match.slice(0, -1) + '</span><span class="j-punct">:</span>';
+      } else {
+        cls = 'j-str';
+      }
+    } else if (/true|false/.test(match)) {
+      cls = 'j-bool';
+    } else if (/null/.test(match)) {
+      cls = 'j-null';
+    }
+    return '<span class="' + cls + '">' + match + '</span>';
+  });
+
+  if (query && query.trim()) {
+    const qClean = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${qClean})`, 'gi');
+    colored = colored.replace(regex, '<mark class="json-match">$1</mark>');
+  }
+
+  return colored;
+}
+
+function renderCodeView(jsonObj, query = "") {
+  const jsonStr = JSON.stringify(jsonObj, null, 2);
+  const highlighted = syntaxHighlight(jsonStr, query);
+  const lines = highlighted.split('\n');
+
+  const rows = lines.map((line, idx) => {
+    return `<div class="editor-row"><span class="line-num">${idx + 1}</span><span class="line-content">${line || ' '}</span></div>`;
+  }).join('');
+
+  return `<div class="json-editor">${rows}</div>`;
+}
+
+function buildTreeHtml(obj, key = null) {
+  const isObj = obj !== null && typeof obj === 'object';
+  const isArr = Array.isArray(obj);
+
+  if (isObj) {
+    const keys = Object.keys(obj);
+    const count = keys.length;
+    const typeLabel = isArr ? `Array[${count}]` : `Object{${count}}`;
+    const openBracket = isArr ? '[' : '{';
+    const closeBracket = isArr ? ']' : '}';
+
+    let html = '<div class="tree-node">';
+    html += '<div class="tree-row">';
+    html += '<span class="tree-toggle" onclick="toggleTreeNode(this)">▼</span>';
+    if (key !== null) {
+      html += `<span class="tree-key">${esc(key)}</span><span class="tree-colon">:</span> `;
+    }
+    html += `<span class="j-punct">${openBracket}</span>`;
+    html += `<span class="tree-badge">${typeLabel}</span>`;
+    html += '</div>';
+
+    html += '<div class="tree-children">';
+    for (const k of keys) {
+      html += buildTreeHtml(obj[k], isArr ? null : k);
+    }
+    html += '</div>';
+    html += `<div class="tree-row" style="padding-left:14px;"><span class="j-punct">${closeBracket}</span></div>`;
+    html += '</div>';
+    return html;
+  } else {
+    let valHtml = '';
+    if (typeof obj === 'string') {
+      valHtml = `<span class="j-str">"${esc(obj)}"</span>`;
+    } else if (typeof obj === 'number') {
+      valHtml = `<span class="j-num">${obj}</span>`;
+    } else if (typeof obj === 'boolean') {
+      valHtml = `<span class="j-bool">${obj}</span>`;
+    } else if (obj === null) {
+      valHtml = `<span class="j-null">null</span>`;
+    } else {
+      valHtml = `<span>${esc(String(obj))}</span>`;
+    }
+
+    let html = '<div class="tree-node"><div class="tree-row" style="padding-left:14px;">';
+    if (key !== null) {
+      html += `<span class="tree-key">${esc(key)}</span><span class="tree-colon">:</span> `;
+    }
+    html += `<span class="tree-val">${valHtml}</span>`;
+    html += '</div></div>';
+    return html;
+  }
+}
+
+function renderTreeView(jsonObj) {
+  return `
+    <div class="json-tree-container">
+      <div style="margin-bottom:10px;display:flex;gap:8px;">
+        <button class="secondary-btn btn-sm" onclick="expandAllTree()">Expand All</button>
+        <button class="secondary-btn btn-sm" onclick="collapseAllTree()">Collapse All</button>
+      </div>
+      ${buildTreeHtml(jsonObj)}
+    </div>
+  `;
+}
+
+function toggleTreeNode(el) {
+  const node = el.closest('.tree-node');
+  if (!node) return;
+  const children = node.querySelector('.tree-children');
+  if (!children) return;
+  const isCollapsed = children.classList.toggle('collapsed');
+  el.classList.toggle('collapsed', isCollapsed);
+  el.textContent = isCollapsed ? '▶' : '▼';
+}
+
+function expandAllTree() {
+  document.querySelectorAll('.tree-children').forEach(c => c.classList.remove('collapsed'));
+  document.querySelectorAll('.tree-toggle').forEach(t => {
+    t.classList.remove('collapsed');
+    t.textContent = '▼';
+  });
+}
+
+function collapseAllTree() {
+  document.querySelectorAll('.tree-children').forEach(c => c.classList.add('collapsed'));
+  document.querySelectorAll('.tree-toggle').forEach(t => {
+    t.classList.add('collapsed');
+    t.textContent = '▶';
+  });
+}
+
+function switchJsonMode(mode) {
+  jsonViewMode = mode;
+  renderModalBody();
+}
+
+function filterJson(query) {
+  jsonSearchQuery = query;
+  const container = $("json-view-container");
+  if (!container || !currentEventData) return;
+
+  if (jsonViewMode === 'code') {
+    container.innerHTML = renderCodeView(currentEventData, query);
+    const matches = container.querySelectorAll('.json-match').length;
+    const counter = $("json-search-matches");
+    if (counter) {
+      counter.textContent = query.trim() ? (matches ? `${matches} found` : '0 found') : '';
+    }
+  }
+}
+
+window.toggleTreeNode = toggleTreeNode;
+window.expandAllTree = expandAllTree;
+window.collapseAllTree = collapseAllTree;
+window.switchJsonMode = switchJsonMode;
+window.filterJson = filterJson;
 
 async function showDetail(id, tab = "ai-view") {
   try {
@@ -339,6 +598,35 @@ function downloadCurrentJson() {
   toast(`✓ Downloaded event-${currentEventData.id}.json`);
 }
 
+function copyCommandOutput() {
+  if (!currentEventData) return;
+  const out = currentEventData.command_output || currentEventData.command || "";
+  navigator.clipboard.writeText(out).then(() => {
+    toast("✓ Đã sao chép phản hồi AI vào clipboard!");
+  }).catch(() => {
+    toast("Không thể sao chép");
+  });
+}
+
+function copyText(txt, label) {
+  navigator.clipboard.writeText(txt).then(() => {
+    toast(`✓ Đã sao chép ${label || 'text'}!`);
+  }).catch(() => {
+    toast("Không thể sao chép");
+  });
+}
+
+function switchModalTab(tab) {
+  currentModalTab = tab;
+  document.querySelectorAll(".modal-tab").forEach(t => {
+    t.classList.toggle("active", t.dataset.tab === currentModalTab);
+  });
+  renderModalBody();
+}
+
+window.copyCommandOutput = copyCommandOutput;
+window.copyText = copyText;
+window.switchModalTab = switchModalTab;
 window.showDetail = showDetail;
 window.copyRawJson = copyRawJson;
 window.downloadCurrentJson = downloadCurrentJson;
