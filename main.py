@@ -18,8 +18,6 @@ from starlette.requests import Request
 
 APP_DIR = Path(__file__).resolve().parent
 DB_PATH = Path(os.getenv("DB_PATH", str(APP_DIR / "data" / "events.db")))
-CONTAINER_NAME = os.getenv("BEELZEBUB_CONTAINER", "beelzebub")
-LOG_SINCE = os.getenv("LOG_SINCE", "5m")
 POLL_INTERVAL = int(os.getenv("POLL_INTERVAL", "2"))
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -75,26 +73,97 @@ def init_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_events_protocol ON events(protocol)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_events_status ON events(event_status)")
 
-def first_value(event: dict, *keys):
-    for key in keys:
-        val = event.get(key)
-        if val not in (None, ""):
-            return val
+def get_candidate_log_files():
+    candidates = []
+    env_file = os.getenv("BEELZEBUB_LOG_FILE") or os.getenv("LOG_FILE")
+    if env_file:
+        candidates.append(Path(env_file))
+    candidates.extend([
+        APP_DIR / "logs" / "beelzebub.json",
+        APP_DIR.parent / "logs" / "beelzebub.json",
+        APP_DIR / "deploy" / "beelzebub" / "logs" / "beelzebub.json",
+        Path("/var/log/beelzebub/beelzebub.json"),
+        Path("/var/log/beelzebub.json"),
+        APP_DIR / "data" / "raw" / "beelzebub_sample.json",
+    ])
+    logs_dir = APP_DIR / "logs"
+    if logs_dir.is_dir():
+        for f in logs_dir.glob("*.json"):
+            if f not in candidates:
+                candidates.append(f)
+    return [p for p in candidates if p.is_file()]
+
+def get_target_container() -> str:
+    env_name = os.getenv("BEELZEBUB_CONTAINER")
+    if env_name:
+        return env_name
+
+    for name in ["beelzebub", "beelzebub-honeypot"]:
+        try:
+            res = subprocess.run(["docker", "inspect", name], capture_output=True, text=True, timeout=3)
+            if res.returncode == 0:
+                return name
+        except Exception:
+            pass
+
+    try:
+        res = subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True, timeout=4)
+        if res.returncode == 0 and res.stdout.strip():
+            for line in res.stdout.strip().splitlines():
+                c = line.strip()
+                if "beelzebub" in c.lower() or "honeypot" in c.lower():
+                    return c
+    except Exception:
+        pass
+
+    return "beelzebub"
+
+def get_field(data: dict, fallback_data: Optional[dict], *candidates) -> Any:
+    for target in (data, fallback_data or {}):
+        if not isinstance(target, dict):
+            continue
+        for key in candidates:
+            if key in target and target[key] not in (None, ""):
+                return target[key]
+        lower_map = {str(k).lower(): v for k, v in target.items() if v not in (None, "")}
+        for key in candidates:
+            if key.lower() in lower_map:
+                return lower_map[key.lower()]
     return None
 
 def parse_record(line: str) -> Optional[dict]:
-    try:
-        record = json.loads(line)
-    except json.JSONDecodeError:
+    if not line or not line.strip():
         return None
+
+    clean_line = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', line.strip())
+    start_idx = clean_line.find("{")
+    end_idx = clean_line.rfind("}")
+    if start_idx == -1 or end_idx == -1 or end_idx <= start_idx:
+        return None
+
+    try:
+        record = json.loads(clean_line[start_idx : end_idx + 1], strict=False)
+    except Exception:
+        return None
+
+    if not isinstance(record, dict):
+        return None
+
     event = record.get("event")
     if not isinstance(event, dict):
-        return None  # operational log, not a honeypot event
+        if isinstance(record.get("data"), dict):
+            event = record["data"]
+        elif isinstance(record.get("payload"), dict):
+            event = record["payload"]
+        else:
+            event = record
 
     event = redact(event)
-    source_ip = first_value(event, "SourceIp")
-    source_port = first_value(event, "SourcePort")
-    remote_addr = first_value(event, "RemoteAddr")
+
+    source_ip = get_field(event, record, "SourceIp", "source_ip", "src_ip", "SourceIP", "remote_ip", "client_ip", "ip")
+    source_port = get_field(event, record, "SourcePort", "source_port", "src_port", "port", "remote_port")
+    remote_addr = get_field(event, record, "RemoteAddr", "remote_addr", "RemoteAddress", "addr")
+
     if (source_ip is None or source_port is None) and isinstance(remote_addr, str) and ":" in remote_addr:
         host, port = remote_addr.rsplit(":", 1)
         source_ip = source_ip or host.strip("[]")
@@ -106,30 +175,53 @@ def parse_record(line: str) -> Optional[dict]:
     except (ValueError, TypeError):
         source_port = None
 
-    # A stable key prevents duplicate insertion when the parser restarts.
-    event_id = first_value(event, "ID")
-    timestamp = first_value(event, "DateTime")
-    stable_material = event_id or json.dumps(event, sort_keys=True, ensure_ascii=False)
-    event_key = f"{timestamp or ''}:{stable_material}:{first_value(event, 'Status') or ''}"
+    event_id = get_field(event, record, "SessionID", "session_id", "session", "sessionId", "ID", "id", "session_uuid")
+    timestamp = get_field(event, record, "DateTime", "datetime", "timestamp", "time", "date_time", "@timestamp", "ts")
+    if not timestamp:
+        timestamp = datetime.now(timezone.utc).isoformat()
+
+    event_status = get_field(event, record, "Status", "status", "event_status", "action", "state")
+    message = get_field(event, record, "Msg", "msg", "message", "Message", "text", "event_type")
+    command = get_field(event, record, "Command", "command", "cmd", "input")
+    command_output = get_field(event, record, "CommandOutput", "command_output", "response", "output", "cmd_output")
+    username = get_field(event, record, "Username", "username", "User", "user", "login")
+    service_desc = get_field(event, record, "Description", "description", "service_description", "service_desc")
+    http_method = get_field(event, record, "HTTPMethod", "http_method", "method")
+    request_uri = get_field(event, record, "RequestURI", "request_uri", "uri", "url", "path")
+    user_agent = get_field(event, record, "UserAgent", "user_agent", "User-Agent", "useragent")
+    body = get_field(event, record, "Body", "body", "data", "post_data")
+    protocol = get_field(event, record, "Protocol", "protocol", "proto", "service") or "ssh"
+
+    has_activity = any([
+        source_ip, remote_addr, command, event_id, username,
+        "event" in record, request_uri, event_status
+    ])
+    if not has_activity:
+        return None
+
+    parts = [str(timestamp or ""), str(source_ip or ""), str(event_id or ""), str(command or ""), str(event_status or "")]
+    event_key = ":".join(parts)
+    if event_key.strip(":") == "":
+        event_key = f"{datetime.now(timezone.utc).timestamp()}:{json.dumps(event, sort_keys=True)}"
 
     return {
         "event_key": event_key,
-        "timestamp": timestamp,
-        "source_ip": source_ip,
+        "timestamp": str(timestamp),
+        "source_ip": str(source_ip) if source_ip else None,
         "source_port": source_port,
-        "protocol": first_value(event, "Protocol"),
-        "session_id": event_id,
-        "event_status": first_value(event, "Status") or record.get("status"),
-        "message": first_value(event, "Msg") or record.get("msg"),
-        "command": first_value(event, "Command"),
-        "command_output": first_value(event, "CommandOutput"),
-        "username": first_value(event, "User"),
-        "service_description": first_value(event, "Description"),
-        "http_method": first_value(event, "HTTPMethod"),
-        "request_uri": first_value(event, "RequestURI"),
-        "user_agent": first_value(event, "UserAgent"),
-        "body": first_value(event, "Body"),
-        "raw_level": record.get("level"),
+        "protocol": str(protocol),
+        "session_id": str(event_id) if event_id else None,
+        "event_status": str(event_status) if event_status else None,
+        "message": str(message) if message else None,
+        "command": str(command) if command else None,
+        "command_output": str(command_output) if command_output else None,
+        "username": str(username) if username else None,
+        "service_description": str(service_desc) if service_desc else None,
+        "http_method": str(http_method) if http_method else None,
+        "request_uri": str(request_uri) if request_uri else None,
+        "user_agent": str(user_agent) if user_agent else None,
+        "body": str(body) if body else None,
+        "raw_level": str(record.get("level")) if record.get("level") else None,
         "raw_json": json.dumps(redact(record), ensure_ascii=False),
         "ingested_at": datetime.now(timezone.utc).isoformat()
     }
@@ -144,47 +236,98 @@ def insert_event(item: dict) -> bool:
         )
         return cur.rowcount > 0
 
-def parser_loop(stop_event: threading.Event):
-    """Follow Docker logs on the VM host and ingest only JSON records containing an event object."""
-    cmd = ["docker", "logs", "--follow", "--since", LOG_SINCE, CONTAINER_NAME]
+def docker_parser_loop(stop_event: threading.Event):
     while not stop_event.is_set():
+        container = get_target_container()
+        since_val = os.getenv("LOG_SINCE")
+        if since_val:
+            cmd = ["docker", "logs", "--follow", "--since", since_val, container]
+        else:
+            cmd = ["docker", "logs", "--follow", "--tail", "2000", container]
+
+        print(f"[parser] Starting Docker log monitor for '{container}' ({' '.join(cmd[2:])})...", flush=True)
+
         try:
             proc = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                text=True, bufsize=1
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1
             )
             assert proc.stdout is not None
+
             for line in proc.stdout:
                 if stop_event.is_set():
                     break
-                parsed = parse_record(line.strip())
+                parsed = parse_record(line)
                 if parsed:
                     try:
-                        insert_event(parsed)
+                        if insert_event(parsed):
+                            print(f"[parser] + Ingested Docker event: [{parsed['protocol']}] IP: {parsed['source_ip']} | Status: {parsed['event_status']} | Cmd: {parsed['command'] or parsed['message'] or '-'}", flush=True)
                     except sqlite3.Error as exc:
-                        print(f"[parser] database error: {exc}", flush=True)
+                        print(f"[parser] Database error: {exc}", flush=True)
+
             proc.terminate()
             try:
+                stderr_data = proc.stderr.read() if proc.stderr else ""
                 proc.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 proc.kill()
+                stderr_data = ""
+
+            if proc.returncode not in (0, None, -15):
+                print(f"[parser] Docker exited with code {proc.returncode}: {stderr_data.strip()}", flush=True)
+
         except FileNotFoundError:
-            print("[parser] Docker CLI not found. Install Docker or run this service on the Honeypot VM host.", flush=True)
+            print("[parser] 'docker' command not found in PATH. Make sure Docker is installed on this host.", flush=True)
         except Exception as exc:
-            print(f"[parser] {type(exc).__name__}: {exc}", flush=True)
+            print(f"[parser] Docker error: {exc}", flush=True)
+
+        stop_event.wait(POLL_INTERVAL)
+
+def file_parser_loop(stop_event: threading.Event):
+    """Monitors any local Beelzebub JSON log files and ingests new records."""
+    file_offsets = {}
+    while not stop_event.is_set():
+        files = get_candidate_log_files()
+        for fpath in files:
+            p_str = str(fpath)
+            try:
+                curr_size = fpath.stat().st_size
+                last_offset = file_offsets.get(p_str, 0)
+                if curr_size > last_offset:
+                    with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
+                        f.seek(last_offset)
+                        for line in f:
+                            parsed = parse_record(line)
+                            if parsed:
+                                try:
+                                    if insert_event(parsed):
+                                        print(f"[parser] + Ingested file event ({fpath.name}): [{parsed['protocol']}] IP: {parsed['source_ip']} | Cmd: {parsed['command'] or parsed['event_status']}", flush=True)
+                                except sqlite3.Error as exc:
+                                    print(f"[parser] Database error: {exc}", flush=True)
+                        file_offsets[p_str] = f.tell()
+                elif curr_size < last_offset:
+                    file_offsets[p_str] = 0
+            except Exception:
+                pass
         stop_event.wait(POLL_INTERVAL)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
     stop_event = threading.Event()
-    worker = threading.Thread(target=parser_loop, args=(stop_event,), daemon=True)
-    worker.start()
+    t_docker = threading.Thread(target=docker_parser_loop, args=(stop_event,), daemon=True)
+    t_file = threading.Thread(target=file_parser_loop, args=(stop_event,), daemon=True)
+    t_docker.start()
+    t_file.start()
     app.state.stop_event = stop_event
-    app.state.worker = worker
+    app.state.workers = [t_docker, t_file]
     yield
     stop_event.set()
-    worker.join(timeout=4)
+    t_docker.join(timeout=3)
+    t_file.join(timeout=3)
 
 app = FastAPI(title="Beelzebub SOC Dashboard", version="0.1.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=APP_DIR / "static"), name="static")
@@ -199,10 +342,54 @@ def dashboard(request: Request):
 
 @app.get("/api/health")
 def health():
-    docker_ok = subprocess.run(["docker", "inspect", CONTAINER_NAME], capture_output=True, text=True).returncode == 0
+    container = get_target_container()
+    docker_ok = False
+    try:
+        docker_ok = subprocess.run(["docker", "inspect", container], capture_output=True, text=True, timeout=3).returncode == 0
+    except Exception:
+        pass
+
     with db_connect() as conn:
         count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
-    return {"status": "ok", "database": str(DB_PATH), "docker_container_found": docker_ok, "events_total": count}
+
+    found_files = [str(p) for p in get_candidate_log_files()]
+
+    return {
+        "status": "ok",
+        "database": str(DB_PATH),
+        "container_name": container,
+        "docker_container_found": docker_ok,
+        "log_files_found": found_files,
+        "events_total": count
+    }
+
+@app.post("/api/events/test")
+def test_event():
+    """Generates a sample honeypot event for testing dashboard reception."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    test_record = {
+        "event_key": f"test:{datetime.now(timezone.utc).timestamp()}",
+        "timestamp": now_iso,
+        "source_ip": "192.168.1.99",
+        "source_port": 49152,
+        "protocol": "ssh",
+        "session_id": "test-session-01",
+        "event_status": "login_success",
+        "message": "Manual test connection",
+        "command": "uname -a",
+        "command_output": "Linux beelzebub-vm 5.15.0-generic",
+        "username": "root",
+        "service_description": "Test Injection",
+        "http_method": None,
+        "request_uri": None,
+        "user_agent": None,
+        "body": None,
+        "raw_level": "info",
+        "raw_json": json.dumps({"test": True, "created_at": now_iso}),
+        "ingested_at": now_iso
+    }
+    inserted = insert_event(test_record)
+    return {"inserted": inserted, "event": test_record}
 
 @app.get("/api/stats")
 def stats():

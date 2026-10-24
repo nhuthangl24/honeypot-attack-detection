@@ -134,15 +134,29 @@ $("modal").addEventListener("click",e=>{if(e.target===$("modal"))$("modal").clas
 async function refreshAll(showToast=false) {
   try {
     const health = await api("/api/health");
-    $("sensor-status").textContent = health.docker_container_found ? "Container connected" : "Container not found";
-    document.querySelector(".pulse").style.background = health.docker_container_found ? "var(--green)" : "var(--red)";
+    let statusText = "Container not found";
+    let isConnected = false;
+    if (health.docker_container_found) {
+      statusText = `Connected (${health.container_name || "Docker"})`;
+      isConnected = true;
+    } else if (health.log_files_found && health.log_files_found.length > 0) {
+      const fname = health.log_files_found[0].split("/").pop();
+      statusText = `File log active (${fname})`;
+      isConnected = true;
+    } else if (health.container_name) {
+      statusText = `No container '${health.container_name}'`;
+    }
+    $("sensor-status").textContent = statusText;
+    const pulseEl = document.querySelector(".pulse");
+    if (pulseEl) pulseEl.style.background = isConnected ? "var(--green)" : "var(--red)";
     await Promise.all([loadStats(),loadLatest(),loadFilters()]);
     if(currentView==="events") await loadEvents();
     if(currentView==="sources") await loadSources();
     if(showToast) toast("Dashboard refreshed");
   } catch(e) {
     $("sensor-status").textContent = "API unavailable";
-    document.querySelector(".pulse").style.background = "var(--red)";
+    const pulseEl = document.querySelector(".pulse");
+    if (pulseEl) pulseEl.style.background = "var(--red)";
     if(showToast) toast("Could not reach dashboard API");
   }
 }
