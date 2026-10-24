@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
@@ -468,10 +468,32 @@ def events(
     with db_connect() as conn:
         total = conn.execute("SELECT COUNT(*) FROM events" + where, args).fetchone()[0]
         rows = conn.execute(
-            "SELECT id, timestamp, source_ip, source_port, protocol, session_id, event_status, message, command, username, service_description, http_method, request_uri, user_agent FROM events"
+            "SELECT id, timestamp, source_ip, source_port, protocol, session_id, event_status, message, command, command_output, username, service_description, http_method, request_uri, user_agent FROM events"
             + where + " ORDER BY id DESC LIMIT ? OFFSET ?", args + [limit, offset]
         ).fetchall()
     return {"total": total, "limit": limit, "offset": offset, "items": [dict(r) for r in rows]}
+
+@app.get("/api/events/export")
+def export_events(format: str = Query("json")):
+    with db_connect() as conn:
+        rows = conn.execute("SELECT * FROM events ORDER BY id ASC").fetchall()
+    items = []
+    for r in rows:
+        it = dict(r)
+        try:
+            it["raw_json"] = json.loads(it["raw_json"])
+        except Exception:
+            pass
+        items.append(it)
+
+    if format == "jsonl":
+        content = "\n".join(json.dumps(it, ensure_ascii=False) for it in items)
+        return Response(content=content, media_type="application/x-ndjson",
+                        headers={"Content-Disposition": "attachment; filename=beelzebub-events.jsonl"})
+
+    content = json.dumps(items, indent=2, ensure_ascii=False)
+    return Response(content=content, media_type="application/json",
+                    headers={"Content-Disposition": "attachment; filename=beelzebub-events.json"})
 
 @app.get("/api/events/{event_id}")
 def event_detail(event_id: int):
@@ -485,6 +507,23 @@ def event_detail(event_id: int):
     except Exception:
         pass
     return item
+
+@app.get("/api/sessions/{session_id}")
+def session_detail(session_id: str):
+    with db_connect() as conn:
+        rows = conn.execute(
+            "SELECT id, timestamp, source_ip, source_port, protocol, session_id, event_status, message, command, command_output, username, service_description, raw_json FROM events WHERE session_id = ? ORDER BY id ASC",
+            (session_id,)
+        ).fetchall()
+    items = []
+    for r in rows:
+        it = dict(r)
+        try:
+            it["raw_json"] = json.loads(it["raw_json"])
+        except Exception:
+            pass
+        items.append(it)
+    return {"session_id": session_id, "total": len(items), "events": items}
 
 @app.get("/api/filters")
 def filters():

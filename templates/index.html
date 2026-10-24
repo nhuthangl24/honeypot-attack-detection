@@ -9,68 +9,264 @@
 <body>
 <div class="app-shell">
   <aside class="sidebar">
-    <div class="brand"><div class="brand-mark">B</div><div><strong>BEELZEBUB</strong><small>HONEYPOT SECURITY</small></div></div>
+    <div class="brand">
+      <div class="brand-mark">B</div>
+      <div>
+        <strong>BEELZEBUB</strong>
+        <small>HONEYPOT SECURITY</small>
+      </div>
+    </div>
     <div class="nav-label">WORKSPACE</div>
     <button class="nav-item active" data-view="overview"><span>◫</span> Overview</button>
     <button class="nav-item" data-view="events"><span>≋</span> Security events <b id="nav-event-count">0</b></button>
     <div class="nav-label">SYSTEM</div>
     <button class="nav-item" data-view="sources"><span>◎</span> Attacker sources</button>
+    
     <div class="sidebar-bottom">
-      <div class="sensor-status"><span class="pulse"></span><div><strong>Honeypot sensor</strong><small id="sensor-status">Checking connection…</small></div></div>
-      <div class="sidebar-foot">PARSER · STORAGE · API<br><span>AI detection not enabled</span></div>
+      <div class="sensor-status">
+        <span class="pulse"></span>
+        <div>
+          <strong>Honeypot sensor</strong>
+          <small id="sensor-status">Checking connection…</small>
+        </div>
+      </div>
+      <div class="sidebar-foot">
+        PARSER · STORAGE · API<br>
+        <span>AI Honeypot Simulation Active</span>
+      </div>
     </div>
   </aside>
 
   <main class="main">
     <header class="topbar">
-      <div><div class="eyebrow">SECURITY OPERATIONS / HONEYPOT</div><h1 id="page-title">Overview</h1></div>
-      <div class="top-actions"><span class="live-pill"><i></i> LIVE INGESTION</span><button class="icon-button" id="refresh-btn" title="Refresh">↻</button></div>
+      <div>
+        <div class="eyebrow">SECURITY OPERATIONS / HONEYPOT</div>
+        <h1 id="page-title">Overview</h1>
+      </div>
+      <div class="top-actions">
+        <a href="/api/events/export" target="_blank" class="btn-export" title="Download all events as JSON"><span>{ }</span> Export JSON</a>
+        <span class="live-pill"><i></i> LIVE INGESTION</span>
+        <button class="icon-button" id="refresh-btn" title="Refresh">↻</button>
+      </div>
     </header>
 
     <section class="view" id="view-overview">
-      <div class="welcome-row"><div><h2>Threat activity</h2><p>Normalized events collected from your Beelzebub container.</p></div><span class="time-tag" id="last-updated">Updated just now</span></div>
+      <div class="welcome-row">
+        <div>
+          <h2>Threat activity</h2>
+          <p>Normalized events collected from your Beelzebub container.</p>
+        </div>
+        <span class="time-tag" id="last-updated">Updated just now</span>
+      </div>
+      
       <div class="metric-grid">
-        <article class="metric-card"><div class="metric-head"><span>Total events</span><span class="metric-icon cyan">≋</span></div><strong id="metric-total">0</strong><div class="metric-foot"><span class="dot cyan-dot"></span> All ingested records</div></article>
-        <article class="metric-card"><div class="metric-head"><span>Events · 24h</span><span class="metric-icon purple">◷</span></div><strong id="metric-24h">0</strong><div class="metric-foot">Last 24 hours</div></article>
-        <article class="metric-card"><div class="metric-head"><span>Unique source IPs</span><span class="metric-icon orange">⌁</span></div><strong id="metric-ips">0</strong><div class="metric-foot">Distinct observed addresses</div></article>
-        <article class="metric-card"><div class="metric-head"><span>Sessions</span><span class="metric-icon green">▣</span></div><strong id="metric-sessions">0</strong><div class="metric-foot">Distinct session IDs</div></article>
+        <article class="metric-card">
+          <div class="metric-head"><span>Total events</span><span class="metric-icon cyan">≋</span></div>
+          <strong id="metric-total">0</strong>
+          <div class="metric-foot"><span class="dot cyan-dot"></span> All ingested records</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-head"><span>Events · 24h</span><span class="metric-icon purple">◷</span></div>
+          <strong id="metric-24h">0</strong>
+          <div class="metric-foot">Last 24 hours</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-head"><span>Unique source IPs</span><span class="metric-icon orange">⌁</span></div>
+          <strong id="metric-ips">0</strong>
+          <div class="metric-foot">Distinct observed addresses</div>
+        </article>
+        <article class="metric-card">
+          <div class="metric-head"><span>Sessions</span><span class="metric-icon green">▣</span></div>
+          <strong id="metric-sessions">0</strong>
+          <div class="metric-foot">Distinct session IDs</div>
+        </article>
       </div>
 
       <div class="content-grid">
-        <section class="panel timeline-panel"><div class="panel-heading"><div><h3>Event volume</h3><p>Hourly activity · last 24 hours</p></div><span class="panel-chip">EVENT TIMELINE</span></div><div id="timeline" class="timeline"><div class="empty">Waiting for events…</div></div></section>
-        <section class="panel"><div class="panel-heading"><div><h3>Protocols</h3><p>Observed service distribution</p></div></div><div id="protocol-chart" class="bar-list"><div class="empty">No protocol data yet</div></div></section>
+        <section class="panel timeline-panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Event volume</h3>
+              <p>Hourly activity · last 24 hours</p>
+            </div>
+            <span class="panel-chip">EVENT TIMELINE</span>
+          </div>
+          <div id="timeline" class="timeline">
+            <div class="empty">Waiting for events…</div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Protocols</h3>
+              <p>Observed service distribution</p>
+            </div>
+          </div>
+          <div id="protocol-chart" class="bar-list">
+            <div class="empty">No protocol data yet</div>
+          </div>
+        </section>
       </div>
 
-      <section class="panel table-panel"><div class="panel-heading"><div><h3>Latest events</h3><p>Most recently ingested honeypot activity</p></div><button class="text-button" data-goto="events">View all events ↗</button></div><div class="table-wrap"><table><thead><tr><th>TIME</th><th>SOURCE</th><th>PROTOCOL</th><th>EVENT</th><th>STATUS</th><th></th></tr></thead><tbody id="latest-body"><tr><td colspan="6" class="empty">Waiting for events…</td></tr></tbody></table></div></section>
+      <section class="panel table-panel">
+        <div class="panel-heading">
+          <div>
+            <h3>Latest events & AI responses</h3>
+            <p>Most recently ingested honeypot activity</p>
+          </div>
+          <button class="text-button" data-goto="events">View all events ↗</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>TIME</th>
+                <th>SOURCE</th>
+                <th>PROTOCOL</th>
+                <th>COMMAND / EVENT</th>
+                <th>STATUS</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="latest-body">
+              <tr><td colspan="6" class="empty">Waiting for events…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <div class="bottom-grid">
-        <section class="panel"><div class="panel-heading"><div><h3>Top source IPs</h3><p>Sources generating the most events</p></div></div><div id="top-ips" class="ip-list"><div class="empty">No source IPs yet</div></div></section>
-        <section class="panel"><div class="panel-heading"><div><h3>Event statuses</h3><p>Beelzebub event lifecycle</p></div></div><div id="status-list" class="bar-list"><div class="empty">No status data yet</div></div></section>
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Top source IPs</h3>
+              <p>Sources generating the most events</p>
+            </div>
+          </div>
+          <div id="top-ips" class="ip-list">
+            <div class="empty">No source IPs yet</div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading">
+            <div>
+              <h3>Event statuses</h3>
+              <p>Beelzebub event lifecycle</p>
+            </div>
+          </div>
+          <div id="status-list" class="bar-list">
+            <div class="empty">No status data yet</div>
+          </div>
+        </section>
       </div>
     </section>
 
     <section class="view hidden" id="view-events">
-      <div class="welcome-row"><div><h2>Security events</h2><p>Search and inspect normalized Beelzebub records.</p></div><span class="time-tag" id="event-total-tag">0 events</span></div>
+      <div class="welcome-row">
+        <div>
+          <h2>Security events</h2>
+          <p>Search and inspect normalized Beelzebub records & AI responses.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <a href="/api/events/export" target="_blank" class="secondary-btn btn-sm">⬇ Export JSON</a>
+          <span class="time-tag" id="event-total-tag">0 events</span>
+        </div>
+      </div>
       <section class="panel filters">
-        <label class="searchbox"><span>⌕</span><input id="search-input" placeholder="Search IP, command, username, URI…" autocomplete="off"></label>
+        <label class="searchbox">
+          <span>⌕</span>
+          <input id="search-input" placeholder="Search IP, command, username, URI…" autocomplete="off">
+        </label>
         <select id="protocol-filter"><option value="">All protocols</option></select>
         <select id="status-filter"><option value="">All statuses</option></select>
         <input id="ip-filter" placeholder="Source IP">
         <button class="primary-btn" id="apply-filters">Apply filters</button>
         <button class="secondary-btn" id="clear-filters">Reset</button>
       </section>
-      <section class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>TIME</th><th>SOURCE</th><th>PROTOCOL</th><th>EVENT / COMMAND</th><th>USER</th><th>STATUS</th><th></th></tr></thead><tbody id="events-body"><tr><td colspan="7" class="empty">Loading events…</td></tr></tbody></table></div><div class="pagination"><span id="pagination-label">Showing 0 events</span><div><button class="secondary-btn" id="prev-page">← Previous</button><button class="secondary-btn" id="next-page">Next →</button></div></div></section>
+      <section class="panel table-panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>TIME</th>
+                <th>SOURCE</th>
+                <th>PROTOCOL</th>
+                <th>COMMAND / EVENT</th>
+                <th>USER</th>
+                <th>STATUS</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="events-body">
+              <tr><td colspan="7" class="empty">Loading events…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span id="pagination-label">Showing 0 events</span>
+          <div>
+            <button class="secondary-btn" id="prev-page">← Previous</button>
+            <button class="secondary-btn" id="next-page">Next →</button>
+          </div>
+        </div>
+      </section>
     </section>
 
     <section class="view hidden" id="view-sources">
-      <div class="welcome-row"><div><h2>Attacker sources</h2><p>Source addresses observed in honeypot event logs. No geolocation enrichment is performed.</p></div></div>
-      <section class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>SOURCE IP</th><th>EVENT COUNT</th><th>LAST SEEN</th><th></th></tr></thead><tbody id="sources-body"><tr><td colspan="4" class="empty">Loading sources…</td></tr></tbody></table></div></section>
+      <div class="welcome-row">
+        <div>
+          <h2>Attacker sources</h2>
+          <p>Source addresses observed in honeypot event logs.</p>
+        </div>
+      </div>
+      <section class="panel table-panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SOURCE IP</th>
+                <th>EVENT COUNT</th>
+                <th>LAST SEEN</th>
+                <th>ACTIONS</th>
+              </tr>
+            </thead>
+            <tbody id="sources-body">
+              <tr><td colspan="4" class="empty">Loading sources…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </section>
 
-    <footer>BEELZEBUB SOC CONSOLE <span>·</span> MVP 0.1 <span>·</span> Detection engine: not configured</footer>
+    <footer>BEELZEBUB SOC CONSOLE <span>·</span> Low-code Deception Runtime <span>·</span> AI Honeypot Dashboard</footer>
   </main>
 </div>
+
 <div class="toast" id="toast"></div>
-<div class="modal-backdrop hidden" id="modal"><section class="detail-modal"><div class="modal-head"><div><div class="eyebrow">EVENT INSPECTOR</div><h2>Event details</h2></div><button class="icon-button" id="close-modal">×</button></div><div id="event-detail" class="detail-content"></div></section></div>
+
+<!-- MODAL: EVENT INSPECTOR & AI REPLAY -->
+<div class="modal-backdrop hidden" id="modal">
+  <section class="detail-modal">
+    <div class="modal-head">
+      <div>
+        <div class="eyebrow" id="modal-eyebrow">EVENT INSPECTOR & AI REPLAY</div>
+        <h2 id="modal-title">Event details</h2>
+      </div>
+      <div class="modal-actions">
+        <a id="modal-api-link" href="#" target="_blank" class="secondary-btn btn-sm" title="View pure JSON API">🔗 JSON API</a>
+        <button id="modal-copy-btn" class="secondary-btn btn-sm">📋 Copy JSON</button>
+        <button class="icon-button" id="close-modal" title="Close">×</button>
+      </div>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" data-tab="ai-view">🖥️ AI Terminal & Details</button>
+      <button class="modal-tab" data-tab="session-view">📜 Session Replay (<span id="session-count-tab">0</span>)</button>
+      <button class="modal-tab" data-tab="json-view">{ } Raw JSON</button>
+    </div>
+    <div id="event-detail" class="detail-content"></div>
+  </section>
+</div>
+
 <script src="/static/app.js"></script>
 </body>
 </html>
