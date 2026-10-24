@@ -185,9 +185,12 @@ def main():
     os.makedirs("data/processed", exist_ok=True)
     df = extract_cyberlab_features(raw_path)
     
-    # Save parquet
-    df.to_parquet("data/processed/sessions.parquet", index=False)
-    df.head(100).to_csv("data/processed/sessions_preview.csv", index=False)
+    # Save processed dataset
+    df.to_csv("data/processed/sessions.csv", index=False)
+    try:
+        df.to_parquet("data/processed/sessions.parquet", index=False)
+    except Exception:
+        pass
 
     print("\n[+] Class distribution in real dataset:")
     print("-" * 50)
