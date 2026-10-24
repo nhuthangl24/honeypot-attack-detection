@@ -24,7 +24,7 @@ function statusBadge(s) {
   return `<span class="status ${statusClass(v)}">${esc(v)}</span>`;
 }
 async function api(url) {
-  const r = await fetch(url);
+  const r = await fetch(url, { cache: "no-store" });
   if (!r.ok) throw new Error(`API ${r.status}`);
   return r.json();
 }
@@ -47,11 +47,12 @@ function eventRow(e, extended=false) {
 }
 async function loadStats() {
   const s = await api("/api/stats");
-  $("metric-total").textContent = Number(s.total_events).toLocaleString();
-  $("metric-24h").textContent = Number(s.events_24h).toLocaleString();
-  $("metric-ips").textContent = Number(s.unique_ips).toLocaleString();
-  $("metric-sessions").textContent = Number(s.sessions).toLocaleString();
-  $("nav-event-count").textContent = Number(s.total_events).toLocaleString();
+  if (!s) return;
+  $("metric-total").textContent = Number(s.total_events || 0).toLocaleString();
+  $("metric-24h").textContent = Number(s.events_24h || 0).toLocaleString();
+  $("metric-ips").textContent = Number(s.unique_ips || 0).toLocaleString();
+  $("metric-sessions").textContent = Number(s.sessions || 0).toLocaleString();
+  $("nav-event-count").textContent = Number(s.total_events || 0).toLocaleString();
   $("last-updated").textContent = "Updated " + new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
   const protocols = s.protocols || [];
   $("protocol-chart").innerHTML = protocols.length ? protocols.map((x,i) => {
@@ -68,7 +69,8 @@ async function loadStats() {
     const max = Math.max(...slots.map(x=>x.count),1);
     $("timeline").innerHTML = slots.map(x=>`<div class="timeline-col" title="${esc(x.key)}: ${x.count} events"><div class="timeline-bar-wrap"><div class="timeline-bar" style="height:${Math.max(x.count?4:1,x.count/max*100)}%"></div></div><small>${x.label}</small></div>`).join("");
   }
-  $("top-ips").innerHTML = s.top_ips.length ? s.top_ips.map(x=>`<div class="ip-row"><div><div class="mono source-ip">${esc(x.ip)}</div><div class="muted">${esc(fmtTime(x.last_seen))}</div></div><span class="ip-count">${x.count} events</span></div>`).join("") : `<div class="empty">No source IPs yet</div>`;
+  const topIps = s.top_ips || [];
+  $("top-ips").innerHTML = topIps.length ? topIps.map(x=>`<div class="ip-row"><div><div class="mono source-ip">${esc(x.ip)}</div><div class="muted">${esc(fmtTime(x.last_seen))}</div></div><span class="ip-count">${x.count} events</span></div>`).join("") : `<div class="empty">No source IPs yet</div>`;
   const statuses = s.statuses || [], maxStatus = Math.max(...statuses.map(x=>x.value),1);
   $("status-list").innerHTML = statuses.length ? statuses.map(x=>`<div class="bar-row"><span class="bar-label">${esc(x.label)}</span><div class="bar-track"><div class="bar-fill" style="width:${x.value/maxStatus*100}%;background:linear-gradient(90deg,#6555a9,#9b8cff)"></div></div><span class="bar-value">${x.value}</span></div>`).join("") : `<div class="empty">No status data yet</div>`;
 }
@@ -154,6 +156,7 @@ async function refreshAll(showToast=false) {
     if(currentView==="sources") await loadSources();
     if(showToast) toast("Dashboard refreshed");
   } catch(e) {
+    console.error("refreshAll error:", e);
     $("sensor-status").textContent = "API unavailable";
     const pulseEl = document.querySelector(".pulse");
     if (pulseEl) pulseEl.style.background = "var(--red)";
