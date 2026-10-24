@@ -25,31 +25,35 @@ class HoneypotMLEngine:
     """
     Bộ Máy ML (Python / XGBoost) phục vụ Detection Pipeline Vòng Lặp 2:
     - Bước 12: Gộp tất cả sự kiện có cùng Session ID
-    - Bước 13: Trích xuất vector 14 đặc trưng (thời lượng, entropy, pass sai...)
+    - Bước 13: Trích xuất vector 14-17 đặc trưng (thời lượng, entropy, pass sai...)
     - Bước 14: Nạp vào XGBoost.predict()
     - Bước 15: Đẩy kết quả phân loại và độ tin cậy sang Dashboard
     """
 
     FEATURE_NAMES = [
-        "duration_seconds",          # 1. Thời lượng phiên (giây)
-        "total_events",             # 2. Tổng số sự kiện trong phiên
-        "total_commands_count",     # 3. Tổng số câu lệnh thực thi
-        "failed_login_count",       # 4. Số lần đăng nhập thất bại (pass sai)
-        "failed_login_ratio",       # 5. Tỉ lệ đăng nhập thất bại
-        "success_login_count",      # 6. Số lần đăng nhập thành công
-        "unique_usernames_count",   # 7. Số lượng username độc nhất
-        "unique_passwords_count",   # 8. Số lượng mật khẩu độc nhất
-        "username_entropy",         # 9. Shannon entropy của username
-        "password_entropy",         # 10. Shannon entropy của mật khẩu
-        "is_root_targeted",         # 11. Mục tiêu có nhắm vào root (1 hoặc 0)
-        "unique_commands_ratio",    # 12. Tỉ lệ lệnh độc nhất / tổng số lệnh
-        "avg_inter_command_delay",   # 13. Độ trễ trung bình giữa các lệnh (giây)
-        "file_download_count"       # 14. Số lệnh tải payload độc hại (wget/curl)
+        "total_events",
+        "duration_seconds",
+        "login_attempts_count",
+        "failed_login_count",
+        "failed_login_ratio",
+        "success_login_count",
+        "unique_usernames_count",
+        "unique_passwords_count",
+        "username_entropy",
+        "password_entropy",
+        "is_root_targeted",
+        "total_commands_count",
+        "unique_commands_ratio",
+        "avg_inter_command_delay",
+        "std_inter_command_delay",
+        "file_download_count",
+        "direct_tcpip_count"
     ]
 
     EXPLOIT_PATTERNS = re.compile(
-        r"(wget|curl|tftp|python -m|bash -i|/dev/tcp/|chmod \+x|chmod 777|nc -e|ncat|socat|sh -c|eval|"
-        r"base64 -d|iptables -F|rm -rf|cat /etc/shadow|cat /etc/passwd|echo .*>> /root/.ssh|insmod|busybox)",
+        r"(wget\s|curl\s|tftp\s|python\s+-m|bash\s+-i|/dev/tcp/|chmod\s+\+x|chmod\s+777|chmod\s+u\+x|"
+        r"nc\s+-e|ncat\s+|socat\s+|sh\s+-c|eval\s+|base64\s+-d|iptables\s+-F|rm\s+-rf\s+/|"
+        r"cat\s+/etc/shadow|echo\s+.*>>\s*/root/\.ssh|insmod\s+|busybox\s+wget|\.sh\s*$|\.bin\s*$)",
         re.IGNORECASE
     )
 
@@ -62,7 +66,7 @@ class HoneypotMLEngine:
         self._load_artifacts()
 
     def _load_artifacts(self):
-        """Tải mô hình XGBoost / Random Forest đã huấn luyện từ thư mục artifacts."""
+        """Tải mô hình XGBoost đã huấn luyện từ thư mục artifacts."""
         try:
             import joblib
             meta_path = os.path.join(self.artifacts_dir, "session_metadata.json")
@@ -76,7 +80,7 @@ class HoneypotMLEngine:
 
             if os.path.isfile(model_path):
                 self.model = joblib.load(model_path)
-                print(f"[ML Engine] Loaded ML model successfully from {model_path}")
+                print(f"[ML Engine] Loaded XGBoost model successfully from {model_path}")
 
             if os.path.isfile(le_path):
                 self.label_encoder = joblib.load(le_path)
@@ -85,11 +89,11 @@ class HoneypotMLEngine:
                 self.scaler = joblib.load(scaler_path)
 
         except Exception as exc:
-            print(f"[ML Engine Warning] Could not load joblib artifacts ({exc}). Fallback to heuristic ML inference active.")
+            print(f"[ML Engine Warning] Could not load joblib artifacts ({exc}). Fallback heuristic active.")
 
     def extract_features(self, events: List[Dict[str, Any]]) -> Dict[str, float]:
         """
-        Bước 13: Trích xuất chính xác vector 14 đặc trưng từ danh sách sự kiện của 1 session.
+        Bước 13: Trích xuất chính xác vector đặc trưng từ chuỗi sự kiện của 1 session.
         """
         if not events:
             return {k: 0.0 for k in self.FEATURE_NAMES}
@@ -118,22 +122,22 @@ class HoneypotMLEngine:
 
             # Inspect status / login
             status = str(ev.get("event_status") or ev.get("status") or "").lower()
-            u = str(ev.get("username") or ev.get("user") or "")
-            p = str(ev.get("password") or ev.get("passwd") or "")
+            u = str(ev.get("username") or ev.get("user") or "").strip()
+            p = str(ev.get("password") or ev.get("passwd") or "").strip()
 
             if u:
                 usernames.append(u)
             if p:
                 passwords.append(p)
 
-            if "login" in status or u or p:
+            if "login" in status or status == "start":
                 login_attempts += 1
                 if "success" in status or status == "start":
                     success_logins += 1
                 elif "fail" in status:
                     failed_logins += 1
-                elif not status and u:
-                    login_attempts += 1
+            elif not status and (u or p):
+                login_attempts += 1
 
             # Inspect commands
             cmd = ev.get("command") or ev.get("cmd") or ev.get("input")
@@ -164,11 +168,15 @@ class HoneypotMLEngine:
 
         # 4 & 5. failed_logins & ratio
         tot_logins = max(login_attempts, failed_logins + success_logins)
+        if tot_logins == 0 and len(events) > 0:
+            tot_logins = 1
+            success_logins = 1
+
         failed_ratio = float(failed_logins / tot_logins) if tot_logins > 0 else 0.0
 
         # 7 & 8. unique accounts
-        unique_u = len(set(usernames))
-        unique_p = len(set(passwords))
+        unique_u = len(set(usernames)) if usernames else 1
+        unique_p = len(set(passwords)) if passwords else 1
 
         # 9 & 10. entropies
         u_entropy = calculate_entropy("".join(usernames))
@@ -180,17 +188,20 @@ class HoneypotMLEngine:
         # 12. unique_commands_ratio
         unique_cmds_ratio = float(len(set(commands)) / tot_cmds) if tot_cmds > 0 else 0.0
 
-        # 13. avg_inter_command_delay
+        # 13 & 14. command delays
         avg_delay = 0.0
+        std_delay = 0.0
         if len(cmd_timestamps) > 1:
             cmd_timestamps.sort()
             delays = [(cmd_timestamps[i+1] - cmd_timestamps[i]).total_seconds() for i in range(len(cmd_timestamps) - 1)]
             avg_delay = float(sum(delays) / len(delays)) if delays else 0.0
+            if len(delays) > 1:
+                std_delay = float(math.sqrt(sum((x - avg_delay) ** 2 for x in delays) / len(delays)))
 
         features = {
-            "duration_seconds": round(duration_sec, 2),
             "total_events": float(tot_events),
-            "total_commands_count": float(tot_cmds),
+            "duration_seconds": round(duration_sec, 2),
+            "login_attempts_count": float(tot_logins),
             "failed_login_count": float(failed_logins),
             "failed_login_ratio": round(failed_ratio, 4),
             "success_login_count": float(success_logins),
@@ -199,27 +210,35 @@ class HoneypotMLEngine:
             "username_entropy": round(u_entropy, 4),
             "password_entropy": round(p_entropy, 4),
             "is_root_targeted": is_root,
+            "total_commands_count": float(tot_cmds),
             "unique_commands_ratio": round(unique_cmds_ratio, 4),
             "avg_inter_command_delay": round(avg_delay, 2),
-            "file_download_count": float(file_downloads)
+            "std_inter_command_delay": round(std_delay, 2),
+            "file_download_count": float(file_downloads),
+            "direct_tcpip_count": 0.0
         }
         return features
 
     def predict(self, features: Dict[str, float]) -> Tuple[str, str, float, str, int]:
         """
-        Bước 14 & 15: Nạp vào XGBoost.predict() -> Xuất kết quả [Tấn công Exploit - Tin cậy: 98.5%]
+        Bước 14 & 15: Nạp vào XGBoost.predict() -> Phân loại chính xác hành vi
         Trả về tuple: (attack_type_vi, class_name_en, confidence, alert_level, risk_score)
         """
         raw_pred_label = None
         confidence = 0.95
 
-        # Nếu có mô hình nạp từ artifacts
+        file_downloads = features.get("file_download_count", 0.0)
+        tot_cmds = features.get("total_commands_count", 0.0)
+        failed_logins = features.get("failed_login_count", 0.0)
+        success_logins = features.get("success_login_count", 0.0)
+        tot_events = features.get("total_events", 0.0)
+
+        # 1. Chạy suy diễn bằng mô hình XGBoost nếu có
         if self.model is not None and self.label_encoder is not None:
             try:
                 import pandas as pd
                 import numpy as np
 
-                # Chuẩn hóa thứ tự cột theo metadata
                 feature_order = self.metadata.get("feature_columns", self.FEATURE_NAMES) if self.metadata else self.FEATURE_NAMES
                 row = {col: features.get(col, 0.0) for col in feature_order}
                 df_X = pd.DataFrame([row])
@@ -233,13 +252,15 @@ class HoneypotMLEngine:
             except Exception as e:
                 raw_pred_label = None
 
-        # Logic phân loại / Fallback rules theo chuẩn hành vi an ninh mạng
-        file_downloads = features.get("file_download_count", 0.0)
-        tot_cmds = features.get("total_commands_count", 0.0)
-        failed_logins = features.get("failed_login_count", 0.0)
-        success_logins = features.get("success_login_count", 0.0)
-        tot_events = features.get("total_events", 0.0)
-        avg_delay = features.get("avg_inter_command_delay", 0.0)
+        # 2. Quy tắc an ninh mạng thực tế (Security Domain Heuristics):
+        # KHÔNG BAO GIỜ gắn nhãn Malware Dropper/Exploit nếu không có hành vi tải file độc hại!
+        if file_downloads == 0 and raw_pred_label == "Automated_Malware_Dropper":
+            if tot_cmds > 0:
+                raw_pred_label = "Interactive_Attacker"
+                confidence = 0.942
+            else:
+                raw_pred_label = "Reconnaissance_Probe"
+                confidence = 0.915
 
         if not raw_pred_label:
             if file_downloads > 0:
@@ -247,43 +268,40 @@ class HoneypotMLEngine:
                 confidence = 0.985
             elif failed_logins >= 2 and success_logins == 0:
                 raw_pred_label = "Brute_Force_Bot"
-                confidence = 0.962
-            elif success_logins > 0 and tot_cmds > 0:
+                confidence = 0.960
+            elif tot_cmds > 0:
                 raw_pred_label = "Interactive_Attacker"
-                confidence = 0.948
-            elif tot_events <= 2 and tot_cmds == 0:
+                confidence = 0.935
+            else:
                 raw_pred_label = "Reconnaissance_Probe"
                 confidence = 0.910
-            else:
-                raw_pred_label = "Interactive_Attacker"
-                confidence = 0.880
 
-        # Ánh xạ nhãn sang chuẩn SOC tiếng Việt trực quan theo sequence diagram
-        if raw_pred_label == "Automated_Malware_Dropper" or file_downloads > 0:
+        # 3. Ánh xạ nhãn tiếng Việt & Mức độ cảnh báo SOC
+        if raw_pred_label == "Automated_Malware_Dropper" and file_downloads > 0:
             attack_type_vi = "Tấn công Exploit / Malware Dropper"
             alert_level = "CRITICAL"
             risk_score = 98
             confidence = max(confidence, 0.985)
-        elif raw_pred_label == "Interactive_Attacker":
-            if file_downloads > 0:
-                attack_type_vi = "Tấn công Exploit (RCE / Remote Shell)"
-                alert_level = "CRITICAL"
-                risk_score = 95
-                confidence = max(confidence, 0.975)
-            else:
-                attack_type_vi = "Xâm nhập tương tác (Interactive Attacker)"
-                alert_level = "HIGH"
-                risk_score = 85
-        elif raw_pred_label == "Brute_Force_Bot":
+        elif raw_pred_label == "Interactive_Attacker" or (tot_cmds > 0 and file_downloads == 0):
+            raw_pred_label = "Interactive_Attacker"
+            attack_type_vi = "Xâm nhập tương tác (Interactive Attacker)"
+            alert_level = "HIGH" if tot_cmds >= 5 else "MEDIUM"
+            risk_score = 65
+            confidence = min(max(confidence, 0.88), 0.95)
+        elif raw_pred_label == "Brute_Force_Bot" or (failed_logins >= 2 and tot_cmds == 0):
+            raw_pred_label = "Brute_Force_Bot"
             attack_type_vi = "Tấn công Dò quét mật khẩu (Brute-Force)"
             alert_level = "HIGH" if failed_logins > 5 else "MEDIUM"
-            risk_score = 75
-        elif raw_pred_label == "Reconnaissance_Probe":
+            risk_score = 70
+            confidence = max(confidence, 0.92)
+        elif raw_pred_label == "Reconnaissance_Probe" or (tot_cmds == 0 and tot_events <= 3):
+            raw_pred_label = "Reconnaissance_Probe"
             attack_type_vi = "Do thám & Quét cổng (Reconnaissance)"
             alert_level = "LOW"
-            risk_score = 35
+            risk_score = 25
+            confidence = max(confidence, 0.90)
         else:
-            attack_type_vi = "Tấn công mạng chưa xác định"
+            attack_type_vi = "Xâm nhập tương tác (Interactive Attacker)"
             alert_level = "MEDIUM"
             risk_score = 50
 
@@ -291,7 +309,7 @@ class HoneypotMLEngine:
 
     def analyze_session(self, events: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Quy trình trọn gói Vòng lặp 2: Trích xuất 14 đặc trưng -> Chạy XGBoost -> Trả kết quả SOC
+        Quy trình trọn gói Vòng lặp 2: Trích xuất đặc trưng -> Chạy XGBoost -> Trả kết quả SOC
         """
         features = self.extract_features(events)
         attack_type_vi, class_en, confidence, alert_level, risk_score = self.predict(features)
@@ -314,7 +332,7 @@ class HoneypotMLEngine:
             "confidence_pct": confidence,
             "alert_level": alert_level,
             "risk_score": risk_score,
-            "is_critical_alarm": alert_level == "CRITICAL" or confidence >= 95.0 and risk_score >= 90,
+            "is_critical_alarm": alert_level == "CRITICAL" and features.get("file_download_count", 0) > 0,
             "features_14": features,
             "commands_analyzed": suspicious_cmds,
             "analyzed_at": datetime.utcnow().isoformat() + "Z"
