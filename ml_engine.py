@@ -25,7 +25,7 @@ class HoneypotMLEngine:
     """
     Bộ Máy ML (Python / XGBoost) phục vụ Detection Pipeline Vòng Lặp 2:
     - Bước 12: Gộp tất cả sự kiện có cùng Session ID
-    - Bước 13: Trích xuất vector 14-17 đặc trưng (thời lượng, entropy, pass sai...)
+    - Bước 13: Trích xuất vector đặc trưng (thời lượng, entropy, pass sai...)
     - Bước 14: Nạp vào XGBoost.predict()
     - Bước 15: Đẩy kết quả phân loại và độ tin cậy sang Dashboard
     """
@@ -253,28 +253,19 @@ class HoneypotMLEngine:
                 raw_pred_label = None
 
         # 2. Quy tắc an ninh mạng thực tế (Security Domain Heuristics):
-        # KHÔNG BAO GIỜ gắn nhãn Malware Dropper/Exploit nếu không có hành vi tải file độc hại!
-        if file_downloads == 0 and raw_pred_label == "Automated_Malware_Dropper":
-            if tot_cmds > 0:
-                raw_pred_label = "Interactive_Attacker"
-                confidence = 0.942
-            else:
-                raw_pred_label = "Reconnaissance_Probe"
-                confidence = 0.915
-
-        if not raw_pred_label:
-            if file_downloads > 0:
-                raw_pred_label = "Automated_Malware_Dropper"
-                confidence = 0.985
-            elif failed_logins >= 2 and success_logins == 0:
-                raw_pred_label = "Brute_Force_Bot"
-                confidence = 0.960
-            elif tot_cmds > 0:
-                raw_pred_label = "Interactive_Attacker"
-                confidence = 0.935
-            else:
-                raw_pred_label = "Reconnaissance_Probe"
-                confidence = 0.910
+        if file_downloads > 0:
+            raw_pred_label = "Automated_Malware_Dropper"
+            confidence = max(confidence, 0.985)
+        elif tot_cmds > 0 and file_downloads == 0:
+            # Gõ lệnh bình thường (whoami, ip a, uname -a, ls) KHÔNG PHẢI malware dropper!
+            raw_pred_label = "Interactive_Attacker"
+            confidence = min(max(confidence, 0.92), 0.96)
+        elif failed_logins >= 2 and tot_cmds == 0:
+            raw_pred_label = "Brute_Force_Bot"
+            confidence = max(confidence, 0.94)
+        elif not raw_pred_label:
+            raw_pred_label = "Reconnaissance_Probe"
+            confidence = 0.91
 
         # 3. Ánh xạ nhãn tiếng Việt & Mức độ cảnh báo SOC
         if raw_pred_label == "Automated_Malware_Dropper" and file_downloads > 0:
@@ -282,28 +273,21 @@ class HoneypotMLEngine:
             alert_level = "CRITICAL"
             risk_score = 98
             confidence = max(confidence, 0.985)
-        elif raw_pred_label == "Interactive_Attacker" or (tot_cmds > 0 and file_downloads == 0):
-            raw_pred_label = "Interactive_Attacker"
+        elif raw_pred_label == "Interactive_Attacker":
             attack_type_vi = "Xâm nhập tương tác (Interactive Attacker)"
             alert_level = "HIGH" if tot_cmds >= 5 else "MEDIUM"
             risk_score = 65
-            confidence = min(max(confidence, 0.88), 0.95)
-        elif raw_pred_label == "Brute_Force_Bot" or (failed_logins >= 2 and tot_cmds == 0):
-            raw_pred_label = "Brute_Force_Bot"
+            confidence = min(max(confidence, 0.90), 0.96)
+        elif raw_pred_label == "Brute_Force_Bot":
             attack_type_vi = "Tấn công Dò quét mật khẩu (Brute-Force)"
             alert_level = "HIGH" if failed_logins > 5 else "MEDIUM"
             risk_score = 70
             confidence = max(confidence, 0.92)
-        elif raw_pred_label == "Reconnaissance_Probe" or (tot_cmds == 0 and tot_events <= 3):
-            raw_pred_label = "Reconnaissance_Probe"
+        else:
             attack_type_vi = "Do thám & Quét cổng (Reconnaissance)"
             alert_level = "LOW"
             risk_score = 25
             confidence = max(confidence, 0.90)
-        else:
-            attack_type_vi = "Xâm nhập tương tác (Interactive Attacker)"
-            alert_level = "MEDIUM"
-            risk_score = 50
 
         return attack_type_vi, raw_pred_label, round(confidence * 100, 1), alert_level, risk_score
 

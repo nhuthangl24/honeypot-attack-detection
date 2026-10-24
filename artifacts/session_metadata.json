@@ -1,5 +1,7 @@
 {
   "champion_model": "XGBoost Classifier",
+  "dataset_source": "CyberLab Cowrie Honeypot (Zenodo 3687527)",
+  "total_dataset_samples": 8860,
   "feature_columns": [
     "total_events",
     "duration_seconds",
@@ -27,8 +29,35 @@
   ],
   "results_comparison": {
     "XGBoost Classifier": {
-      "accuracy": 1.0,
-      "macro_f1": 1.0
+      "accuracy": 0.9977426636568849,
+      "macro_f1": 0.9975289338321253
     }
-  }
+  },
+  "confusion_matrix": [
+    [
+      33,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      48,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      233,
+      0
+    ],
+    [
+      0,
+      0,
+      4,
+      1454
+    ]
+  ],
+  "trained_at": "2026-10-24T04:58:15.939893Z"
 }
