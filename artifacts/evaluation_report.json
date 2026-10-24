@@ -1,0 +1,158 @@
+{
+  "evaluation_timestamp": "2026-10-23T19:10:43Z",
+  "branch_1_session": {
+    "champion_model": "Random Forest (Balanced)",
+    "classes": [
+      "Automated_Malware_Dropper",
+      "Brute_Force_Bot",
+      "Interactive_Attacker",
+      "Reconnaissance_Probe"
+    ],
+    "latency_ms_per_sample": 14.250460500000003,
+    "comparison": {
+      "Dummy (Majority Class)": {
+        "accuracy": 0.891500904159132,
+        "macro_precision": 0.222875226039783,
+        "macro_recall": 0.25,
+        "macro_f1": 0.23565965583173995,
+        "weighted_f1": 0.8403631849913041
+      },
+      "Logistic Regression (Balanced)": {
+        "accuracy": 0.9616636528028933,
+        "macro_precision": 0.8989125575028658,
+        "macro_recall": 0.8085411942554799,
+        "macro_f1": 0.8251309441551713,
+        "weighted_f1": 0.9590447726744368
+      },
+      "Random Forest (Balanced)": {
+        "accuracy": 0.9996383363471971,
+        "macro_precision": 0.9983108108108107,
+        "macro_recall": 0.9998985801217039,
+        "macro_f1": 0.9991018221456547,
+        "weighted_f1": 0.9996389126491138
+      },
+      "XGBoost Classifier": {
+        "accuracy": 0.9996383363471971,
+        "macro_precision": 0.9983108108108107,
+        "macro_recall": 0.9998985801217039,
+        "macro_f1": 0.9991018221456547,
+        "weighted_f1": 0.9996389126491138
+      },
+      "LightGBM Classifier": {
+        "accuracy": 0.9996383363471971,
+        "macro_precision": 0.9983108108108107,
+        "macro_recall": 0.9998985801217039,
+        "macro_f1": 0.9991018221456547,
+        "weighted_f1": 0.9996389126491138
+      },
+      "CatBoost Classifier": {
+        "accuracy": 0.9985533453887884,
+        "macro_precision": 0.9948985801217038,
+        "macro_recall": 0.9943430245661483,
+        "macro_f1": 0.9945643388324064,
+        "weighted_f1": 0.9985527296862812
+      }
+    },
+    "confusion_matrix": [
+      [
+        135,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        18,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        147,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        2464
+      ]
+    ]
+  },
+  "branch_2_command": {
+    "champion_model": "TF-IDF + Multinomial Naive Bayes",
+    "classes": [
+      "Benign_Neutral",
+      "Defense_Evasion",
+      "Discovery",
+      "Execution_Dropper",
+      "Persistence_PrivEsc"
+    ],
+    "latency_ms_per_sample": 0.27354391800000144,
+    "comparison": {
+      "Dummy (Majority Class)": {
+        "accuracy": 0.7230769230769231,
+        "macro_f1": 0.16785714285714287,
+        "weighted_f1": 0.6068681318681319
+      },
+      "TF-IDF + Multinomial Naive Bayes": {
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "weighted_f1": 1.0
+      },
+      "TF-IDF + Logistic Regression (Balanced)": {
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "weighted_f1": 1.0
+      },
+      "TF-IDF + LinearSVC (Balanced)": {
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "weighted_f1": 1.0
+      },
+      "TF-IDF + SGDClassifier (Log-loss)": {
+        "accuracy": 1.0,
+        "macro_f1": 1.0,
+        "weighted_f1": 1.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        141,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        11,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        2,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        33,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        8
+      ]
+    ]
+  }
+}

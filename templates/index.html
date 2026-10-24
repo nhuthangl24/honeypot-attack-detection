@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Beelzebub | SOC Console</title>
+  <title>Beelzebub SOC Console & ML Detection</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -12,58 +12,76 @@
     <div class="brand">
       <div class="brand-mark">B</div>
       <div>
-        <strong>BEELZEBUB</strong>
-        <small>HONEYPOT SECURITY</small>
+        <strong>BEELZEBUB SOC</strong>
+        <small>AI DECEPTION & ML</small>
       </div>
     </div>
-    <div class="nav-label">WORKSPACE</div>
+    <div class="nav-label">MONITORING</div>
     <button class="nav-item active" data-view="overview"><span>◫</span> Overview</button>
     <button class="nav-item" data-view="events"><span>≋</span> Security events <b id="nav-event-count">0</b></button>
-    <div class="nav-label">SYSTEM</div>
+    <button class="nav-item" data-view="ml-sessions"><span>🧠</span> ML Threat Detection <b id="nav-ml-count">0</b></button>
     <button class="nav-item" data-view="sources"><span>◎</span> Attacker sources</button>
     
     <div class="sidebar-bottom">
       <div class="sensor-status">
         <span class="pulse"></span>
         <div>
-          <strong>Honeypot sensor</strong>
-          <small id="sensor-status">Checking connection…</small>
+          <strong>Detection Engine</strong>
+          <small id="sensor-status">XGBoost & File Watcher Active</small>
         </div>
       </div>
       <div class="sidebar-foot">
-        PARSER · STORAGE · API<br>
-        <span>AI Honeypot Simulation Active</span>
+        VM 2: ML + SOC DASHBOARD<br>
+        <span>Pipeline: 14 Features → XGBoost</span>
       </div>
     </div>
   </aside>
 
   <main class="main">
+    <!-- BANNER CHUÔNG CẢNH BÁO ĐỎ (RED ALARM SIREN BANNER) -->
+    <div id="alarm-banner" class="alarm-banner hidden">
+      <div class="alarm-content">
+        <span class="siren-icon">🚨</span>
+        <div class="alarm-text">
+          <strong id="alarm-title">PHÁT HIỆN TẤN CÔNG EXPLOIT - TIN CẬY: 98.5%!</strong>
+          <p id="alarm-desc">Bộ máy XGBoost vừa phân tích và phát hiện hành vi tải mã độc / khai thác hệ thống!</p>
+        </div>
+      </div>
+      <div class="alarm-actions">
+        <button id="alarm-silence-btn" class="alarm-btn">🔇 Tắt chuông</button>
+        <button id="alarm-inspect-btn" class="alarm-btn primary">🔍 Xem 14 Đặc trưng ML</button>
+      </div>
+    </div>
+
     <header class="topbar">
       <div>
-        <div class="eyebrow">SECURITY OPERATIONS / HONEYPOT</div>
+        <div class="eyebrow">HONEYPOT SOC OPERATIONS / VM2 NODE</div>
         <h1 id="page-title">Overview</h1>
       </div>
       <div class="top-actions">
+        <button id="test-exploit-btn" class="btn-test-exploit" title="Tạo phiên tấn công Exploit giả lập để test Bước 11-16 & Chuông đỏ">⚡ Test Exploit & Báo Động</button>
+        <button id="sound-toggle-btn" class="btn-sound active" title="Bật/Tắt chuông âm thanh cảnh báo">🔔 Còi báo: BẬT</button>
         <a href="/api/events/export" target="_blank" class="btn-export" title="Download all events as JSON"><span>{ }</span> Export JSON</a>
         <span class="live-pill"><i></i> LIVE INGESTION</span>
         <button class="icon-button" id="refresh-btn" title="Refresh">↻</button>
       </div>
     </header>
 
+    <!-- VIEW 1: OVERVIEW -->
     <section class="view" id="view-overview">
       <div class="welcome-row">
         <div>
-          <h2>Threat activity</h2>
-          <p>Normalized events collected from your Beelzebub container.</p>
+          <h2>Threat Activity & ML Inference</h2>
+          <p>Dữ liệu sự kiện được ingest từ Honeypot VM1 kết hợp phân tích phân loại của Bộ máy ML XGBoost trên VM2.</p>
         </div>
         <span class="time-tag" id="last-updated">Updated just now</span>
       </div>
       
       <div class="metric-grid">
         <article class="metric-card">
-          <div class="metric-head"><span>Total events</span><span class="metric-icon cyan">≋</span></div>
+          <div class="metric-head"><span>Total Events</span><span class="metric-icon cyan">≋</span></div>
           <strong id="metric-total">0</strong>
-          <div class="metric-foot"><span class="dot cyan-dot"></span> All ingested records</div>
+          <div class="metric-foot"><span class="dot cyan-dot"></span> Ingested log events</div>
         </article>
         <article class="metric-card">
           <div class="metric-head"><span>Events · 24h</span><span class="metric-icon purple">◷</span></div>
@@ -71,14 +89,14 @@
           <div class="metric-foot">Last 24 hours</div>
         </article>
         <article class="metric-card">
-          <div class="metric-head"><span>Unique source IPs</span><span class="metric-icon orange">⌁</span></div>
-          <strong id="metric-ips">0</strong>
-          <div class="metric-foot">Distinct observed addresses</div>
+          <div class="metric-head"><span>ML Classified Sessions</span><span class="metric-icon green">🧠</span></div>
+          <strong id="metric-ml-sessions">0</strong>
+          <div class="metric-foot">XGBoost inference count</div>
         </article>
-        <article class="metric-card">
-          <div class="metric-head"><span>Sessions</span><span class="metric-icon green">▣</span></div>
-          <strong id="metric-sessions">0</strong>
-          <div class="metric-foot">Distinct session IDs</div>
+        <article class="metric-card highlight-card">
+          <div class="metric-head"><span>Critical Exploits</span><span class="metric-icon red">🚨</span></div>
+          <strong id="metric-critical">0</strong>
+          <div class="metric-foot"><span class="dot red-dot"></span> Cảnh báo đỏ kích hoạt</div>
         </article>
       </div>
 
@@ -87,7 +105,7 @@
           <div class="panel-heading">
             <div>
               <h3>Event volume</h3>
-              <p>Hourly activity · last 24 hours</p>
+              <p>Mật độ sự kiện theo giờ (24h qua)</p>
             </div>
             <span class="panel-chip">EVENT TIMELINE</span>
           </div>
@@ -95,15 +113,17 @@
             <div class="empty">Waiting for events…</div>
           </div>
         </section>
+
         <section class="panel">
           <div class="panel-heading">
             <div>
-              <h3>Protocols</h3>
-              <p>Observed service distribution</p>
+              <h3>Phân loại Tấn công ML (XGBoost)</h3>
+              <p>Kết quả nhận diện hành vi tấn công từ 14 đặc trưng</p>
             </div>
+            <span class="panel-chip">ML CLASSIFICATION</span>
           </div>
-          <div id="protocol-chart" class="bar-list">
-            <div class="empty">No protocol data yet</div>
+          <div id="ml-chart" class="bar-list">
+            <div class="empty">Chưa có phiên phân loại ML</div>
           </div>
         </section>
       </div>
@@ -111,8 +131,8 @@
       <section class="panel table-panel">
         <div class="panel-heading">
           <div>
-            <h3>Latest events & AI responses</h3>
-            <p>Most recently ingested honeypot activity</p>
+            <h3>Latest Security Events & ML Detection</h3>
+            <p>Các sự kiện mới nhất cùng nhãn phân loại từ Bộ máy ML</p>
           </div>
           <button class="text-button" data-goto="events">View all events ↗</button>
         </div>
@@ -124,12 +144,13 @@
                 <th>SOURCE</th>
                 <th>PROTOCOL</th>
                 <th>COMMAND / EVENT</th>
+                <th>ML DETECTION</th>
                 <th>STATUS</th>
                 <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody id="latest-body">
-              <tr><td colspan="6" class="empty">Waiting for events…</td></tr>
+              <tr><td colspan="7" class="empty">Waiting for events…</td></tr>
             </tbody>
           </table>
         </div>
@@ -139,8 +160,8 @@
         <section class="panel">
           <div class="panel-heading">
             <div>
-              <h3>Top source IPs</h3>
-              <p>Sources generating the most events</p>
+              <h3>Top Source IPs</h3>
+              <p>Địa chỉ IP tấn công nhiều nhất</p>
             </div>
           </div>
           <div id="top-ips" class="ip-list">
@@ -150,22 +171,23 @@
         <section class="panel">
           <div class="panel-heading">
             <div>
-              <h3>Event statuses</h3>
-              <p>Beelzebub event lifecycle</p>
+              <h3>Protocols & Services</h3>
+              <p>Phân bố dịch vụ bị nhắm tới</p>
             </div>
           </div>
-          <div id="status-list" class="bar-list">
-            <div class="empty">No status data yet</div>
+          <div id="protocol-chart" class="bar-list">
+            <div class="empty">No protocol data yet</div>
           </div>
         </section>
       </div>
     </section>
 
+    <!-- VIEW 2: SECURITY EVENTS -->
     <section class="view hidden" id="view-events">
       <div class="welcome-row">
         <div>
-          <h2>Security events</h2>
-          <p>Search and inspect normalized Beelzebub records & AI responses.</p>
+          <h2>Security Events Log</h2>
+          <p>Tìm kiếm, lọc và phân tích toàn bộ sự kiện thô và phản hồi AI từ Honeypot.</p>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <a href="/api/events/export" target="_blank" class="secondary-btn btn-sm">⬇ Export JSON</a>
@@ -193,12 +215,13 @@
                 <th>PROTOCOL</th>
                 <th>COMMAND / EVENT</th>
                 <th>USER</th>
+                <th>ML DETECTION</th>
                 <th>STATUS</th>
                 <th>ACTIONS</th>
               </tr>
             </thead>
             <tbody id="events-body">
-              <tr><td colspan="7" class="empty">Loading events…</td></tr>
+              <tr><td colspan="8" class="empty">Loading events…</td></tr>
             </tbody>
           </table>
         </div>
@@ -212,11 +235,43 @@
       </section>
     </section>
 
+    <!-- VIEW 3: ML SESSIONS & THREAT DETECTION -->
+    <section class="view hidden" id="view-ml-sessions">
+      <div class="welcome-row">
+        <div>
+          <h2>ML Threat Detection Pipeline (Vòng Lặp 2)</h2>
+          <p>Danh sách các phiên (Session ID) được File Watcher tự động trích xuất 14 đặc trưng và phân loại bằng XGBoost.</p>
+        </div>
+      </div>
+      <section class="panel table-panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SESSION ID</th>
+                <th>ATTACKER IP</th>
+                <th>XGBOOST PHÂN LOẠI</th>
+                <th>ĐỘ TIN CẬY</th>
+                <th>MỨC ĐỘ RỦI RO</th>
+                <th>CẢNH BÁO ĐỎ</th>
+                <th>THỜI GIAN PHÂN TÍCH</th>
+                <th>CHI TIẾT</th>
+              </tr>
+            </thead>
+            <tbody id="ml-sessions-body">
+              <tr><td colspan="8" class="empty">Chưa có phiên phân loại ML nào.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <!-- VIEW 4: ATTACKER SOURCES -->
     <section class="view hidden" id="view-sources">
       <div class="welcome-row">
         <div>
-          <h2>Attacker sources</h2>
-          <p>Source addresses observed in honeypot event logs.</p>
+          <h2>Attacker Sources</h2>
+          <p>Danh sách các địa chỉ IP nguồn thực hiện quét hoặc tấn công vào Honeypot.</p>
         </div>
       </div>
       <section class="panel table-panel">
@@ -238,19 +293,19 @@
       </section>
     </section>
 
-    <footer>BEELZEBUB SOC CONSOLE <span>·</span> Low-code Deception Runtime <span>·</span> AI Honeypot Dashboard</footer>
+    <footer>BEELZEBUB SOC CONSOLE <span>·</span> VM 2 Detection Node <span>·</span> Python XGBoost Detection Engine</footer>
   </main>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<!-- MODAL: EVENT INSPECTOR & AI REPLAY -->
+<!-- MODAL: EVENT INSPECTOR & ML 14-FEATURE EXPLAINABILITY -->
 <div class="modal-backdrop hidden" id="modal">
   <section class="detail-modal">
     <div class="modal-head">
       <div>
-        <div class="eyebrow" id="modal-eyebrow">EVENT INSPECTOR & AI REPLAY</div>
-        <h2 id="modal-title">Event details</h2>
+        <div class="eyebrow" id="modal-eyebrow">EVENT INSPECTOR & ML EXPLAINABILITY</div>
+        <h2 id="modal-title">Chi tiết Sự Kiện & Phân Tích</h2>
       </div>
       <div class="modal-actions">
         <a id="modal-api-link" href="#" target="_blank" class="secondary-btn btn-sm" title="View pure JSON API">🔗 JSON API</a>
@@ -260,6 +315,7 @@
     </div>
     <div class="modal-tabs">
       <button class="modal-tab active" data-tab="ai-view">🖥️ AI Terminal & Details</button>
+      <button class="modal-tab" data-tab="ml-view">🧠 14 Đặc Trưng ML & XGBoost</button>
       <button class="modal-tab" data-tab="session-view">📜 Session Replay (<span id="session-count-tab">0</span>)</button>
       <button class="modal-tab" data-tab="json-view">{ } Raw JSON</button>
     </div>

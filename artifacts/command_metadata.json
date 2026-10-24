@@ -1,0 +1,74 @@
+{
+  "champion_model": "TF-IDF + Multinomial Naive Bayes",
+  "class_names": [
+    "Benign_Neutral",
+    "Defense_Evasion",
+    "Discovery",
+    "Execution_Dropper",
+    "Persistence_PrivEsc"
+  ],
+  "results_comparison": {
+    "Dummy (Majority Class)": {
+      "accuracy": 0.7230769230769231,
+      "macro_f1": 0.16785714285714287,
+      "weighted_f1": 0.6068681318681319
+    },
+    "TF-IDF + Multinomial Naive Bayes": {
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0
+    },
+    "TF-IDF + Logistic Regression (Balanced)": {
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0
+    },
+    "TF-IDF + LinearSVC (Balanced)": {
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0
+    },
+    "TF-IDF + SGDClassifier (Log-loss)": {
+      "accuracy": 1.0,
+      "macro_f1": 1.0,
+      "weighted_f1": 1.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      141,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      11,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      2,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      33,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      8
+    ]
+  ]
+}

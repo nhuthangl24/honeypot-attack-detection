@@ -1,15 +1,12 @@
 [Unit]
-Description=Beelzebub SOC Dashboard and Log Parser
-After=network-online.target docker.service
+Description=Beelzebub ML Detection Engine and SOC Dashboard (VM 2)
+After=network-online.target
 Wants=network-online.target
-Requires=docker.service
 
 [Service]
 Type=simple
-User=nhuthang
+User=root
 WorkingDirectory=/opt/beelzebub-dashboard
-Environment=BEELZEBUB_CONTAINER=beelzebub
-Environment=LOG_SINCE=5m
 Environment=PORT=8080
 ExecStart=/opt/beelzebub-dashboard/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8080
 Restart=always

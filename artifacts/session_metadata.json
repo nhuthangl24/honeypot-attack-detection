@@ -1,0 +1,98 @@
+{
+  "champion_model": "Random Forest (Balanced)",
+  "feature_columns": [
+    "total_events",
+    "duration_seconds",
+    "login_attempts_count",
+    "failed_login_count",
+    "failed_login_ratio",
+    "success_login_count",
+    "unique_usernames_count",
+    "unique_passwords_count",
+    "username_entropy",
+    "password_entropy",
+    "is_root_targeted",
+    "total_commands_count",
+    "unique_commands_ratio",
+    "avg_inter_command_delay",
+    "std_inter_command_delay",
+    "file_download_count",
+    "direct_tcpip_count"
+  ],
+  "class_names": [
+    "Automated_Malware_Dropper",
+    "Brute_Force_Bot",
+    "Interactive_Attacker",
+    "Reconnaissance_Probe"
+  ],
+  "results_comparison": {
+    "Dummy (Majority Class)": {
+      "accuracy": 0.891500904159132,
+      "macro_precision": 0.222875226039783,
+      "macro_recall": 0.25,
+      "macro_f1": 0.23565965583173995,
+      "weighted_f1": 0.8403631849913041
+    },
+    "Logistic Regression (Balanced)": {
+      "accuracy": 0.9616636528028933,
+      "macro_precision": 0.8989125575028658,
+      "macro_recall": 0.8085411942554799,
+      "macro_f1": 0.8251309441551713,
+      "weighted_f1": 0.9590447726744368
+    },
+    "Random Forest (Balanced)": {
+      "accuracy": 0.9996383363471971,
+      "macro_precision": 0.9983108108108107,
+      "macro_recall": 0.9998985801217039,
+      "macro_f1": 0.9991018221456547,
+      "weighted_f1": 0.9996389126491138
+    },
+    "XGBoost Classifier": {
+      "accuracy": 0.9996383363471971,
+      "macro_precision": 0.9983108108108107,
+      "macro_recall": 0.9998985801217039,
+      "macro_f1": 0.9991018221456547,
+      "weighted_f1": 0.9996389126491138
+    },
+    "LightGBM Classifier": {
+      "accuracy": 0.9996383363471971,
+      "macro_precision": 0.9983108108108107,
+      "macro_recall": 0.9998985801217039,
+      "macro_f1": 0.9991018221456547,
+      "weighted_f1": 0.9996389126491138
+    },
+    "CatBoost Classifier": {
+      "accuracy": 0.9985533453887884,
+      "macro_precision": 0.9948985801217038,
+      "macro_recall": 0.9943430245661483,
+      "macro_f1": 0.9945643388324064,
+      "weighted_f1": 0.9985527296862812
+    }
+  },
+  "confusion_matrix": [
+    [
+      135,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      18,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      147,
+      0
+    ],
+    [
+      0,
+      0,
+      1,
+      2464
+    ]
+  ]
+}

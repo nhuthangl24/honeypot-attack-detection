@@ -1469,3 +1469,235 @@ footer span {
   .bottom-grid { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr; }
 }
+
+
+/* ==============================================================================
+   ML & RED ALARM SIREN STYLES (VÒNG LẶP 2)
+   ============================================================================== */
+
+@keyframes pulseRedAlarm {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    border-color: #ef4444;
+  }
+  50% {
+    box-shadow: 0 0 25px 8px rgba(239, 68, 68, 0.4);
+    border-color: #f87171;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    border-color: #ef4444;
+  }
+}
+
+@keyframes sirenFlash {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.15); filter: brightness(1.4); }
+}
+
+.alarm-banner {
+  background: linear-gradient(90deg, #3d0e12 0%, #1f0b0e 100%);
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  padding: 12px 18px;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  animation: pulseRedAlarm 1.8s infinite ease-in-out;
+  transition: all 0.3s ease;
+}
+
+.alarm-banner.hidden {
+  display: none !important;
+}
+
+.alarm-content {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.siren-icon {
+  font-size: 26px;
+  animation: sirenFlash 0.9s infinite ease-in-out;
+}
+
+.alarm-text strong {
+  color: #fca5a5;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  display: block;
+}
+
+.alarm-text p {
+  margin: 3px 0 0;
+  color: #fecaca;
+  font-size: 12px;
+}
+
+.alarm-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.alarm-btn {
+  background: #2b1115;
+  border: 1px solid #7f1d1d;
+  color: #fca5a5;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.alarm-btn:hover {
+  background: #45151c;
+  border-color: #ef4444;
+}
+
+.alarm-btn.primary {
+  background: #dc2626;
+  border-color: #ef4444;
+  color: #fff;
+}
+
+.alarm-btn.primary:hover {
+  background: #b91c1c;
+}
+
+.btn-test-exploit {
+  background: linear-gradient(135deg, #7f1d1d 0%, #b91c1c 100%);
+  color: #fff;
+  border: 1px solid #ef4444;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.btn-test-exploit:hover {
+  filter: brightness(1.2);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.btn-sound {
+  background: #152233;
+  color: #94a3b8;
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-sound.active {
+  background: #0f2e24;
+  border-color: #10b981;
+  color: #6ee7b7;
+}
+
+.btn-sound.muted {
+  background: #2d181c;
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+.highlight-card {
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  background: linear-gradient(180deg, rgba(31, 11, 14, 0.7) 0%, var(--panel) 100%) !important;
+}
+
+.red-dot {
+  background: #ef4444 !important;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+/* ML BADGES */
+.ml-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ml-badge.exploit {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+.ml-badge.brute {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fcd34d;
+}
+
+.ml-badge.recon {
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+}
+
+.ml-badge.interactive {
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  color: #d8b4fe;
+}
+
+.ml-badge.benign {
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #cbd5e1;
+}
+
+/* 14 FEATURES GRID IN MODAL */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.feature-item {
+  background: #0c1420;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.feature-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.feature-value {
+  font-family: 'DM Mono', monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.feature-desc {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 2px;
+}
